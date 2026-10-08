@@ -17,6 +17,21 @@ uv sync
 uv run leiria-traffic serve          # http://127.0.0.1:8765
 ```
 
+### From other machines on the LAN
+
+```properties
+powershell -ExecutionPolicy Bypass -File scripts\install-webui-task.ps1   # once, from an elevated shell
+```
+
+- This registers the task `\BD\LeiriaTraffic\WebUI`, which starts at logon and serves on `0.0.0.0:8765`.
+  It also adds a firewall rule for TCP 8765 on the Private profile only.
+- Stop it by hand with `Stop-ScheduledTask -TaskPath '\BD\LeiriaTraffic' -TaskName WebUI`. Start it again
+  with `Start-ScheduledTask`, or by logging on again.
+- Other machines get a login page and need `LT_ACCESS_KEY`. The browser keeps it in a cookie for a year.
+  The host itself is never asked. `serve --host 0.0.0.0` refuses to start without a key, because
+  otherwise anyone on the network could spend the TomTom quota and read the favourites.
+- Logs go to `data/serve.log`.
+
 - **Route profile tab:** pick A and B (search box or click the map), choose a date and a departure
   window, then press *Generate*. You get a chart and a table of 144 departures, the best and worst
   slot in the window, and the provider's no-traffic time. *Compare scenarios* overlays the next real
@@ -49,6 +64,7 @@ uv run leiria-traffic collect        # what the scheduled task runs
 | `LT_CACHE_TTL_DAYS` | `7` | How long a provider answer is reused |
 | `LT_RAIN_ADJUST_PCT` | `0` | Optional rain factor (off). If set, it is listed as `weather_adjustment` and never hidden inside the provider value |
 | `LT_HOLIDAY_SUBDIV` | `10` | `holidays` subdivision (10 = Leiria district, which adds 22 May) |
+| `LT_ACCESS_KEY` | – | Login key for clients other than the host itself. Required to serve beyond loopback |
 | `LT_DB_PATH`, `LT_DATA_DIR` | `data/` | SQLite file and the folder holding the calendar and events YAML |
 
 ## API

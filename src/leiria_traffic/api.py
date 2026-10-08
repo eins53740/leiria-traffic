@@ -1,15 +1,16 @@
 """FastAPI app: JSON API + the single-page UI in static/."""
 from __future__ import annotations
 
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from datetime import date, time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings, setup_logging
@@ -34,6 +35,39 @@ async def lifespan(_: FastAPI):
 
 api = FastAPI(title="Leiria traffic", lifespan=lifespan)
 api.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+COOKIE = "lt_key"
+LOOPBACK = {"127.0.0.1", "::1"}
+LOGIN_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Leiria traffic</title><body style="font-family:system-ui;max-width:22rem;margin:4rem auto;padding:0 1rem">
+<h2>Leiria traffic</h2><form method="post" action="/login"><p>{msg}</p>
+<input name="key" type="password" autofocus style="width:100%;padding:.5rem" placeholder="access key">
+<p><button style="padding:.5rem 1rem">Open</button></p></form></body>"""
+
+
+def _access_key() -> str:
+    return getattr(getattr(state.get("app"), "settings", None), "access_key", "")
+
+
+@api.middleware("http")
+async def require_access_key(request: Request, call_next):
+    """Remote clients need the LT_ACCESS_KEY cookie; this machine itself never does."""
+    key = _access_key()
+    host = request.client.host if request.client else ""
+    if not key or host in LOOPBACK:
+        return await call_next(request)
+    if request.url.path == "/login" and request.method == "POST":
+        given = parse_qs((await request.body()).decode()).get("key", [""])[0]
+        if hmac.compare_digest(given, key):
+            resp = RedirectResponse("/", status_code=303)
+            resp.set_cookie(COOKIE, key, max_age=365 * 86400, httponly=True, samesite="strict")
+            return resp
+        return HTMLResponse(LOGIN_PAGE.format(msg="Wrong key."), status_code=401)
+    if hmac.compare_digest(request.cookies.get(COOKIE, ""), key):
+        return await call_next(request)
+    if request.url.path == "/":
+        return HTMLResponse(LOGIN_PAGE.format(msg="Access key (API_Keys.md, leiria-traffic):"), status_code=401)
+    return JSONResponse({"detail": "access key required"}, status_code=401)
 
 
 def _app() -> App:

@@ -1,6 +1,6 @@
 """Command line: run the web app, sample live traffic (collector), query from the shell.
 
-  leiria-traffic serve [--port 8765]
+  leiria-traffic serve [--host 127.0.0.1] [--port 8765]
   leiria-traffic collect                      # one live sample per collecting route
   leiria-traffic add-route NAME A B [--collect]
   leiria-traffic estimate A B YYYY-MM-DD HH:MM
@@ -55,6 +55,14 @@ async def collect(settings: Settings) -> int:
         return 1 if failures else 0
 
 
+def _log_to_file(settings: Settings, name: str) -> None:
+    """Task Scheduler runs these hidden: keep a small rotating log next to the DB."""
+    fh = logging.handlers.RotatingFileHandler(settings.data_dir / name, maxBytes=1_000_000, backupCount=2,
+                                              encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(fh)
+
+
 def main(argv: list[str] | None = None) -> int:
     setup_logging()
     p = argparse.ArgumentParser(prog="leiria-traffic")
@@ -70,15 +78,15 @@ def main(argv: list[str] | None = None) -> int:
     settings = Settings.load()
 
     if args.cmd == "serve":
+        if args.host not in ("127.0.0.1", "localhost", "::1") and not settings.access_key:
+            log.error("serving on %s needs LT_ACCESS_KEY, or anyone on the network can use the TomTom key", args.host)
+            return 2
         import uvicorn
-        uvicorn.run("leiria_traffic.api:api", host=args.host, port=args.port)
+        _log_to_file(settings, "serve.log")
+        uvicorn.run("leiria_traffic.api:api", host=args.host, port=args.port, log_config=None)
         return 0
     if args.cmd == "collect":
-        # runs hidden from Task Scheduler: keep a small rotating log next to the DB
-        fh = logging.handlers.RotatingFileHandler(settings.data_dir / "collector.log", maxBytes=1_000_000,
-                                                  backupCount=2, encoding="utf-8")
-        fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-        logging.getLogger().addHandler(fh)
+        _log_to_file(settings, "collector.log")
         return asyncio.run(collect(settings))
     if args.cmd == "add-route":
         from .db import Store

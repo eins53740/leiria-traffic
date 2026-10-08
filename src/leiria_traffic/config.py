@@ -31,6 +31,7 @@ class Settings:
     rain_adjust_pct: float
     holiday_subdiv: str | None
     data_dir: Path
+    access_key: str
 
     @classmethod
     def load(cls) -> "Settings":
@@ -48,6 +49,7 @@ class Settings:
             rain_adjust_pct=float(e("LT_RAIN_ADJUST_PCT", "0")),
             holiday_subdiv=e("LT_HOLIDAY_SUBDIV", "10") or None,
             data_dir=data,
+            access_key=e("LT_ACCESS_KEY", ""),
         )
 
 

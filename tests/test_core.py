@@ -202,3 +202,31 @@ def test_favourite_places_api(store):
         assert [p["name"] for p in c.get("/api/places").json()] == ["Home"]
     finally:
         api.state.clear()
+
+
+def test_remote_clients_need_the_access_key(store):
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from leiria_traffic import api
+
+    api.state["app"] = SimpleNamespace(store=store, settings=SimpleNamespace(access_key="k3y"))
+    try:
+        c = TestClient(api.api)  # client host is "testclient", so it counts as remote
+        assert c.get("/api/places").status_code == 401
+        page = c.get("/")
+        assert page.status_code == 401 and 'action="/login"' in page.text
+        assert c.post("/login", data={"key": "wrong"}).status_code == 401
+        ok = c.post("/login", data={"key": "k3y"}, follow_redirects=False)
+        assert ok.status_code == 303 and "httponly" in ok.headers["set-cookie"].lower()
+        assert c.get("/api/places").status_code == 200  # the cookie now rides along
+    finally:
+        api.state.clear()
+
+
+def test_lan_serve_refuses_without_access_key(monkeypatch):
+    from leiria_traffic import cli
+
+    monkeypatch.setenv("LT_ACCESS_KEY", "")
+    assert cli.main(["serve", "--host", "0.0.0.0"]) == 2
