@@ -1,0 +1,26 @@
+# Portuguese public-school calendar (pré-escolar, básico, secundário).
+# Source: Despacho 8368/2024 (covers 2024-25 .. 2027-28), amended by
+#   Despacho 9989/2025 (Natal 2025-26 -> 17 Dec 2025 .. 2 Jan 2026) and
+#   Despacho 10430/2026 (2026-27 secundário científico-humanísticos start 21 Sep 2026).
+#   https://diariodarepublica.pt/dr/detalhe/despacho/8368-2024-873447631
+# There is no official API/ICS feed: update this file when a new despacho is published.
+#
+# "term" = days when classes run. A date is "school term" when it lies inside a
+# term range and outside every break. Term start uses the latest allowed date
+# of the window (schools choose 11-15 Sep) and end uses the latest cycle end
+# (pré-escolar/1.º ciclo); see `partial_end` for earlier cycle ends.
+years:
+  "2025-26":
+    term: ["2025-09-15", "2026-06-30"]
+    partial_end: {y9_11_12: "2026-06-05", y5_8_10: "2026-06-12"}
+    breaks:
+      natal: ["2025-12-17", "2026-01-02"]
+      carnaval: ["2026-02-16", "2026-02-18"]
+      pascoa: ["2026-03-30", "2026-04-10"]
+  "2026-27":
+    term: ["2026-09-15", "2027-06-30"]
+    partial_end: {y9_11_12: "2027-06-04", y5_8_10: "2027-06-11"}
+    breaks:
+      natal: ["2026-12-16", "2026-12-31"]
+      carnaval: ["2027-02-08", "2027-02-10"]
+      pascoa: ["2027-03-22", "2027-04-02"]

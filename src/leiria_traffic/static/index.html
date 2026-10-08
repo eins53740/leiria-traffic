@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leiria Traffic</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2430; --muted:#667085; --line:#e4e7ec; --accent:#0e7c66; --warn:#b54708; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#11151c; --card:#1a2029; --ink:#e6e9ee; --muted:#98a2b3; --line:#2b3340; --accent:#3cc8a5; --warn:#f79009; } }
+  * { box-sizing:border-box }
+  body { margin:0; font:14px/1.45 system-ui,Segoe UI,sans-serif; background:var(--bg); color:var(--ink) }
+  header { padding:12px 16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--card) }
+  header h1 { font-size:17px; margin:0 }
+  nav button { border:0; background:none; color:var(--muted); font:inherit; padding:6px 10px; border-radius:6px; cursor:pointer }
+  nav button.on { background:var(--accent); color:#fff }
+  main { padding:16px; max-width:1300px; margin:auto }
+  .grid { display:grid; grid-template-columns: minmax(280px,380px) 1fr; gap:16px }
+  @media (max-width:900px) { .grid { grid-template-columns:1fr } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px }
+  label { display:block; color:var(--muted); font-size:12px; margin:10px 0 3px }
+  input, select { width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font:inherit }
+  .row { display:flex; gap:8px } .row > * { flex:1 }
+  button.go { margin-top:12px; width:100%; padding:9px; border:0; border-radius:6px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer }
+  button.go.alt { background:none; border:1px solid var(--accent); color:var(--accent) }
+  button:disabled { opacity:.5; cursor:wait }
+  #map, #hmap { height:420px; border-radius:10px }
+  .hits { position:relative } .hits ul { position:absolute; z-index:1000; left:0; right:0; margin:0; padding:0; list-style:none; background:var(--card); border:1px solid var(--line); border-radius:6px }
+  .hits li { padding:6px 8px; cursor:pointer } .hits li:hover { background:var(--bg) }
+  .kpi { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0 }
+  .kpi div { flex:1; min-width:140px; background:var(--bg); border-radius:8px; padding:8px 10px }
+  .kpi b { display:block; font-size:20px }
+  .muted { color:var(--muted); font-size:12px } .warn { color:var(--warn) }
+  table { border-collapse:collapse; width:100%; font-size:13px }
+  th, td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--line) }
+  .tablewrap { max-height:420px; overflow:auto }
+  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:var(--bg); border:1px solid var(--line) }
+  .legend { display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px }
+  .legend span.bar { flex:1; height:10px; border-radius:5px; background:linear-gradient(90deg,#1a9850,#fee08b,#d73027) }
+  [hidden] { display:none !important }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚗 Leiria traffic</h1>
+  <nav><button data-tab="route" class="on">Route profile</button><button data-tab="heat">Leiria heatmap</button></nav>
+  <span class="muted" id="status"></span>
+</header>
+<main>
+<!-- ============ ROUTE PROFILE ============ -->
+<section id="tab-route">
+  <div class="grid">
+    <div class="card">
+      <label>Point A (origin) — search or click the map</label>
+      <div class="hits"><input id="qa" placeholder="e.g. Leiria, Praça Rodrigues Lobo"><ul id="ha"></ul></div>
+      <label>Point B (destination)</label>
+      <div class="hits"><input id="qb" placeholder="e.g. Maceira"><ul id="hb"></ul></div>
+      <div class="row">
+        <div><label>Date</label><input type="date" id="day"></div>
+        <div><label>Weather</label><select id="weather">
+          <option value="auto">forecast (≤16 days)</option><option value="dry">assume dry</option><option value="rain">assume rain</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Window from</label><input type="time" id="w0" value="07:00" step="600"></div>
+        <div><label>to</label><input type="time" id="w1" value="09:30" step="600"></div>
+      </div>
+      <button class="go" id="go">Generate daily profile</button>
+      <button class="go alt" id="cmp">Compare scenarios (same weekday)</button>
+      <p class="muted">A full day is 144 provider calls (cached for 7 days). Comparing 4 scenarios is 576 calls the first time.</p>
+      <div id="ctx" class="muted"></div>
+    </div>
+    <div class="card"><div id="map"></div></div>
+  </div>
+  <div class="card" style="margin-top:16px" id="result" hidden>
+    <div class="kpi" id="kpis"></div>
+    <canvas id="chart" height="110"></canvas>
+    <p class="muted" id="legendnote"></p>
+    <div class="tablewrap"><table id="tbl"><thead><tr>
+      <th>Departure</th><th>Duration</th><th>Arrival</th><th>Typical</th><th>No traffic</th><th>Measured P50 / P75 / P90</th><th>Weather</th><th>Source</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ HEATMAP ============ -->
+<section id="tab-heat" hidden>
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <div><label>Date</label><input type="date" id="hday"></div>
+        <div><label>Direction</label><select id="hdir"><option value="in">→ to the centre</option><option value="out">from the centre →</option></select></div>
+      </div>
+      <label>Show</label>
+      <select id="hmode"><option value="ratio">congestion (predicted ÷ no-traffic time)</option><option value="time">minutes to/from the centre</option></select>
+      <label>Departure: <b id="htime">08:00</b></label>
+      <input type="range" id="hslot" min="0" max="143" value="48">
+      <button class="go" id="hgo">Draw heatmap</button>
+      <p class="muted">10×10 grid, ±6 km around Praça Rodrigues Lobo. Each new departure time = 100 TomTom route calls (free tier: 20 000/month), cached for 7 days.</p>
+      <div class="legend"><span id="lmin">low</span><span class="bar"></span><span id="lmax">high</span></div>
+      <p class="muted" id="hnote"></p>
+    </div>
+    <div class="card"><div id="hmap"></div></div>
+  </div>
+</section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const status = t => $('#status').textContent = t || '';
+const pad = n => String(n).padStart(2, '0');
+const slotLabel = i => `${pad(Math.floor(i / 6))}:${pad(i % 6 * 10)}`;
+function nextWeekday() { const d = new Date(); do d.setDate(d.getDate() + 1); while ([0, 6].includes(d.getDay())); return d.toISOString().slice(0, 10); }
+$('#day').value = $('#hday').value = nextWeekday();
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  $('#tab-route').hidden = b.dataset.tab !== 'route'; $('#tab-heat').hidden = b.dataset.tab !== 'heat';
+  (b.dataset.tab === 'route' ? map : hmap).invalidateSize();
+});
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
+  return body;
+}
+
+/* ---------------- route map + search ---------------- */
+const tiles = () => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+const map = L.map('map').setView([39.7436, -8.8071], 12); tiles().addTo(map);
+const pts = { a: null, b: null }, marks = {};
+function setPoint(k, lat, lon, label) {
+  pts[k] = { lat, lon, label };
+  if (marks[k]) marks[k].setLatLng([lat, lon]);
+  else { marks[k] = L.marker([lat, lon], { draggable: true, title: k.toUpperCase() }).addTo(map).bindTooltip(k.toUpperCase(), { permanent: true });
+         marks[k].on('dragend', e => { const p = e.target.getLatLng(); setPoint(k, p.lat, p.lng, 'pin'); }); }
+  $('#q' + k).value = label || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  save();
+}
+map.on('click', e => setPoint(!pts.a ? 'a' : !pts.b ? 'b' : 'b', e.latlng.lat, e.latlng.lng));
+function save() { try { localStorage.setItem('lt.pts', JSON.stringify(pts)); } catch {} }
+try { const s = JSON.parse(localStorage.getItem('lt.pts') || '{}'); ['a', 'b'].forEach(k => s[k] && setPoint(k, s[k].lat, s[k].lon, s[k].label)); } catch {}
+
+['a', 'b'].forEach(k => {
+  let timer;
+  $('#q' + k).addEventListener('input', e => {
+    clearTimeout(timer); const q = e.target.value.trim();
+    if (q.length < 3) { $('#h' + k).innerHTML = ''; return; }
+    timer = setTimeout(async () => {
+      try {
+        const hits = await getJSON(`/api/geocode?q=${encodeURIComponent(q)}`);
+        $('#h' + k).innerHTML = '';
+        hits.forEach(h => { const li = document.createElement('li'); li.textContent = h.label;
+          li.onclick = () => { setPoint(k, h.lat, h.lon, h.label); $('#h' + k).innerHTML = ''; map.panTo([h.lat, h.lon]); };
+          $('#h' + k).appendChild(li); });
+      } catch (err) { status(err.message); }
+    }, 350);
+  });
+});
+
+/* ---------------- profile ---------------- */
+let chart;
+const colors = ['#0e7c66', '#2563eb', '#b54708', '#7a5af8', '#c11574'];
+function inWindow(t) { return t >= $('#w0').value && t <= $('#w1').value; }
+
+function drawChart(series) {
+  const labels = series[0].data.slots.map(s => s.departure);
+  const ds = [];
+  series.forEach((s, i) => {
+    const slots = s.data.slots;
+    ds.push({ label: s.name, data: slots.map(x => x.duration_min), borderColor: colors[i % colors.length], pointRadius: 0, borderWidth: 2, tension: .2 });
+    if (series.length === 1) {
+      ds.push({ label: 'no traffic (provider)', data: slots.map(x => x.free_flow_min), borderColor: '#98a2b3', borderDash: [4, 4], pointRadius: 0, borderWidth: 1 });
+      if (slots.some(x => x.high_min)) {
+        ds.push({ label: 'provider pessimistic', data: slots.map(x => x.high_min), borderColor: '#d92d20', pointRadius: 0, borderWidth: 1, borderDash: [2, 3] });
+        ds.push({ label: 'provider optimistic', data: slots.map(x => x.low_min), borderColor: '#12b76a', pointRadius: 0, borderWidth: 1, borderDash: [2, 3] });
+      }
+      if (slots.some(x => x.measured)) ['p50', 'p75', 'p90'].forEach((p, j) =>
+        ds.push({ label: `measured ${p.toUpperCase()} (our data)`, data: slots.map(x => x.measured?.[p] ?? null), borderColor: ['#7a5af8', '#9e77ed', '#d6bbfb'][j], pointRadius: 2, showLine: false }));
+    }
+  });
+  chart?.destroy();
+  chart = new Chart($('#chart'), { type: 'line', data: { labels, datasets: ds }, options: {
+    interaction: { mode: 'index', intersect: false }, animation: false,
+    scales: { y: { title: { display: true, text: 'minutes' }, beginAtZero: false }, x: { ticks: { maxTicksLimit: 24 } } },
+    plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y ?? '–'} min` } } } } });
+}
+
+function render(series) {
+  const p = series[0].data;
+  $('#result').hidden = false;
+  const win = p.slots.filter(s => s.duration_min != null && inWindow(s.departure));
+  const best = win.reduce((a, b) => (!a || b.duration_min < a.duration_min ? b : a), null);
+  const worst = win.reduce((a, b) => (!a || b.duration_min > a.duration_min ? b : a), null);
+  $('#kpis').innerHTML = [
+    best && `<div><span class="muted">Best in ${$('#w0').value}–${$('#w1').value}</span><b>${best.departure} · ${best.duration_min} min</b><span class="muted">arrive ${best.arrival}</span></div>`,
+    worst && `<div><span class="muted">Worst in window</span><b>${worst.departure} · ${worst.duration_min} min</b><span class="muted">+${(worst.duration_min - best.duration_min).toFixed(1)} min vs best</span></div>`,
+    p.summary && `<div><span class="muted">No traffic</span><b>${p.summary.free_flow_min ?? '–'} min</b><span class="muted">provider free-flow</span></div>`,
+    `<div><span class="muted">Context</span><b style="font-size:14px">${p.context}</b><span class="muted">${p.providers.join(', ') || 'no provider answered'}</span></div>`,
+  ].filter(Boolean).join('');
+  $('#legendnote').innerHTML = (p.errors.length ? `<span class="warn">Errors: ${p.errors.join(' | ')}</span><br>` : '') +
+    'Durations are the <b>provider prediction</b> (TomTom: historic traffic for that date and slot). "Measured" points are <b>our own</b> live samples (collector), shown when ≥3 match this weekday/term/weather. Any rain adjustment is listed in the Source column.';
+  drawChart(series);
+  const tb = $('#tbl tbody'); tb.innerHTML = '';
+  p.slots.forEach(s => {
+    const m = s.measured ? `${s.measured.p50} / ${s.measured.p75} / ${s.measured.p90} <span class="muted">n=${s.measured.n}</span>` : '–';
+    const src = s.error ? `<span class="warn">${s.error.slice(0, 80)}</span>` :
+      `<span class="tag">${s.provider} prediction</span>` + s.adjustments.map(a => ` <span class="tag" title="${a.reason}">+${Math.round(a.seconds / 60)} min ${a.source}</span>`).join('');
+    const tr = document.createElement('tr'); if (inWindow(s.departure)) tr.style.fontWeight = 600;
+    tr.innerHTML = `<td>${s.departure}</td><td>${s.duration_min ?? '–'} min</td><td>${s.arrival ?? '–'}</td><td>${s.typical_min ?? '–'}</td><td>${s.free_flow_min ?? '–'}</td><td>${m}</td><td>${s.weather ?? '–'}</td><td>${src}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function routeQS() {
+  if (!pts.a || !pts.b) throw new Error('pick Point A and Point B first');
+  return `origin=${pts.a.lat},${pts.a.lon}&dest=${pts.b.lat},${pts.b.lon}`;
+}
+async function busy(btn, fn) {
+  document.querySelectorAll('button.go').forEach(b => b.disabled = true);
+  try { await fn(); status(''); } catch (e) { status('⚠ ' + e.message); } finally { document.querySelectorAll('button.go').forEach(b => b.disabled = false); }
+}
+$('#go').onclick = () => busy($('#go'), async () => {
+  const qs = routeQS(); status('asking the provider for 144 departures…');
+  const data = await getJSON(`/api/profile?${qs}&day=${$('#day').value}&weather=${$('#weather').value}`);
+  $('#ctx').textContent = data.context;
+  render([{ name: `${data.date} (${$('#weather').value})`, data }]);
+});
+$('#cmp').onclick = () => busy($('#cmp'), async () => {
+  const qs = routeQS();
+  const wd = (new Date($('#day').value).getDay() + 6) % 7;
+  const scen = await getJSON(`/api/scenarios?weekday=${wd}`);
+  const series = [];
+  for (const s of scen) {
+    status(`scenario ${series.length + 1}/${scen.length}: ${s.scenario} (${s.date})…`);
+    series.push({ name: `${s.scenario} · ${s.date}`, data: await getJSON(`/api/profile?${qs}&day=${s.date}&weather=dry`) });
+  }
+  render(series);
+  $('#legendnote').innerHTML += '<br>Each line is the provider prediction for the <b>next real date</b> of that kind (weather assumed dry). Differences between lines come from the provider\'s own historic profiles, not from a model of ours.';
+});
+
+/* ---------------- heatmap ---------------- */
+const hmap = L.map('hmap').setView([39.7436, -8.8071], 12); tiles().addTo(hmap);
+const layer = L.layerGroup().addTo(hmap);
+$('#hslot').oninput = e => $('#htime').textContent = slotLabel(+e.target.value);
+function ramp(t) { // 0..1 -> green, yellow, red
+  const c = [[26, 152, 80], [254, 224, 139], [215, 48, 39]], i = t < .5 ? 0 : 1, f = t < .5 ? t * 2 : (t - .5) * 2;
+  return `rgb(${c[i].map((v, k) => Math.round(v + (c[i + 1][k] - v) * f)).join(',')})`;
+}
+$('#hgo').onclick = () => busy($('#hgo'), async () => {
+  status('asking the provider for 100 routes…');
+  const mode = $('#hmode').value;
+  const h = await getJSON(`/api/heatmap?day=${$('#hday').value}&at=${slotLabel(+$('#hslot').value)}&mode=${mode}&direction=${$('#hdir').value}`);
+  layer.clearLayers();
+  const vals = h.cells.map(c => c.value).filter(v => v != null && v > 0);
+  const lo = mode === 'ratio' ? 1 : Math.min(...vals), hi = mode === 'ratio' ? Math.max(1.5, ...vals) : Math.max(...vals);
+  const step = a => { const u = [...new Set(a)].sort((x, y) => x - y); return u.length > 1 ? u[1] - u[0] : .01; };
+  const dLat = step(h.cells.map(c => c.lat)), dLon = step(h.cells.map(c => c.lon));
+  h.cells.forEach(c => {
+    if (c.value == null) return;
+    L.rectangle([[c.lat - dLat / 2, c.lon - dLon / 2], [c.lat + dLat / 2, c.lon + dLon / 2]],
+      { stroke: false, fillOpacity: .55, fillColor: ramp(Math.min(1, Math.max(0, (c.value - lo) / ((hi - lo) || 1)))) })
+      .bindTooltip(`${c.minutes} min${c.ratio ? ` · ×${c.ratio} vs no traffic` : ''}`).addTo(layer);
+  });
+  L.circleMarker(h.centre, { radius: 6, color: '#000' }).bindTooltip('centre').addTo(layer);
+  $('#lmin').textContent = mode === 'ratio' ? '×1.0' : `${lo.toFixed(0)} min`;
+  $('#lmax').textContent = mode === 'ratio' ? `×${hi.toFixed(2)}` : `${hi.toFixed(0)} min`;
+  $('#hnote').textContent = `${h.date} ${h.departure}, ${h.direction}. ${h.cells.length}/${h.requested} cells routed, ${h.provider_calls} new provider calls. Source: ${h.source} (${h.provider}).`;
+});
+</script>
+</body>
+</html>

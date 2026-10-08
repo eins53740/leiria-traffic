@@ -1,0 +1,11 @@
+# Hand-maintained Leiria events that can change traffic.
+# One-off: {name, start, end, location, impact}   (impact: low | medium | high)
+# Recurring weekly: {name, weekdays: [mon..sun], location, impact, since, until?}
+# No official feed exists (checked 2026-10-07); the 2026 Feira de Maio was cancelled.
+events: []
+recurring:
+  - name: Mercado Levante
+    weekdays: [tue, sat]
+    location: Estádio Dr. Magalhães Pessoa car park
+    impact: low
+    since: "2026-05-04"  # Câmara decision of 4 May 2026

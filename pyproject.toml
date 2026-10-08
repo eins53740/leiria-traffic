@@ -1,0 +1,35 @@
+[project]
+name = "leiria-traffic"
+version = "0.1.0"
+description = "Typical travel times around Leiria per 10-minute departure slot, plus a congestion heatmap"
+readme = "README.md"
+authors = [
+    { name = "Bruno Dias", email = "bfsd@mega.ist.utl.pt" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.142.4",
+    "holidays>=0.106",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.3",
+    "tzdata>=2026.5",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+leiria-traffic = "leiria_traffic.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
