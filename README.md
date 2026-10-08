@@ -12,7 +12,7 @@ percentiles come from a collector that samples live traffic every 10 minutes.
 ## Quick start
 
 ```properties
-cd D:\Github\BD\leiria-traffic
+cd leiria-traffic
 uv sync
 uv run leiria-traffic serve          # http://127.0.0.1:8765
 ```
@@ -41,7 +41,7 @@ uv run leiria-traffic collect        # what the scheduled task runs
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TOMTOM_API_KEY` | – | TomTom key (source: `BD_only\API_Keys.md` §5). Needed for routing, heatmap, geocoding and the collector |
+| `TOMTOM_API_KEY` | – | TomTom key (free at developer.tomtom.com, no card). Needed for routing, heatmap, geocoding and the collector |
 | `GOOGLE_MAPS_API_KEY` | – | Google Routes API key for the fallback. Empty means the fallback is skipped |
 | `LT_PROVIDERS` | `tomtom,google` | Order of the fallback chain |
 | `LT_GOOGLE_BOUNDS` | `0` | `1` adds Google PESSIMISTIC and OPTIMISTIC calls (3× cost) to show a range |
