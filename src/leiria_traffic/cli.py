@@ -18,7 +18,7 @@ from datetime import date, datetime, time
 
 import httpx
 
-from .config import Settings
+from .config import Settings, setup_logging
 from .engine import TZ
 from .models import Point, snap_to_slot
 from .routing import ProviderError
@@ -56,7 +56,7 @@ async def collect(settings: Settings) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    setup_logging()
     p = argparse.ArgumentParser(prog="leiria-traffic")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("serve"); s.add_argument("--host", default="127.0.0.1"); s.add_argument("--port", type=int, default=8765)

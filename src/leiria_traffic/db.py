@@ -1,4 +1,4 @@
-"""SQLite store: saved routes, the prediction cache, collected observations, day contexts.
+"""SQLite store: favourite places, saved routes, the prediction cache, collected observations, day contexts.
 
 No raw API responses are stored — only the numbers the app uses.
 """
@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS contexts (
     weekend     INTEGER NOT NULL, school_term INTEGER NOT NULL, school_break TEXT,
     public_holiday TEXT, events TEXT NOT NULL DEFAULT '[]'
 );
+CREATE TABLE IF NOT EXISTS places (            -- favourites: Home, Work, ...
+    name        TEXT PRIMARY KEY,
+    point       TEXT NOT NULL,          -- "lat,lon" (5 dp)
+    label       TEXT NOT NULL DEFAULT ''
+);
 CREATE INDEX IF NOT EXISTS obs_slot ON observations(route_id, slot);
 """
 
@@ -86,6 +91,19 @@ class Store:
                                 ((datetime.now() - older_than).isoformat(timespec="seconds"),))
         self.conn.commit()
         return cur.rowcount
+
+    # --- favourite places ------------------------------------------------------
+    def places(self) -> list[dict]:
+        return [dict(r) for r in self.conn.execute("SELECT name, point, label FROM places ORDER BY name")]
+
+    def put_place(self, name: str, p: Point, label: str = "") -> None:
+        self.conn.execute("INSERT OR REPLACE INTO places VALUES (?,?,?)", (name, p.key(), label))
+        self.conn.commit()
+
+    def delete_place(self, name: str) -> bool:
+        cur = self.conn.execute("DELETE FROM places WHERE name=?", (name,))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # --- routes -------------------------------------------------------------
     def add_route(self, name: str, o: Point, d: Point, o_label: str = "", d_label: str = "",

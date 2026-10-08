@@ -1,6 +1,7 @@
 """Settings from environment variables (a repo-root .env is read if present; real env wins)."""
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,3 +49,11 @@ class Settings:
             holiday_subdiv=e("LT_HOLIDAY_SUBDIV", "10") or None,
             data_dir=data,
         )
+
+
+def setup_logging() -> None:
+    """INFO logs for the app; httpx stays at WARNING because its INFO line prints the
+    full request URL, and the TomTom key travels in the query string."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

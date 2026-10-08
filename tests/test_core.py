@@ -179,3 +179,26 @@ def test_scenario_dates(make_engine):
     assert found["summer holidays"]["date"] == "2027-07-05"
     for s in found.values():
         assert date.fromisoformat(s["date"]).weekday() == 0
+
+
+def test_favourite_places_api(store):
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from leiria_traffic import api
+
+    api.state["app"] = SimpleNamespace(store=store)
+    try:
+        c = TestClient(api.api)  # no `with`: the lifespan (real providers) does not run
+        assert c.put("/api/places/Home", params={"point": "39.75000,-8.81000", "label": "home"}).status_code == 200
+        c.put("/api/places/Work", params={"point": "39.69000,-8.89000"})
+        c.put("/api/places/Home", params={"point": "39.74,-8.80"})  # re-saving moves it
+        assert c.get("/api/places").json() == [{"name": "Home", "point": "39.74000,-8.80000", "label": ""},
+                                               {"name": "Work", "point": "39.69000,-8.89000", "label": ""}]
+        assert c.put("/api/places/Bad", params={"point": "nowhere"}).status_code == 422
+        assert c.delete("/api/places/Work").status_code == 200
+        assert c.delete("/api/places/Work").status_code == 404
+        assert [p["name"] for p in c.get("/api/places").json()] == ["Home"]
+    finally:
+        api.state.clear()

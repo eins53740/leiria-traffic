@@ -118,3 +118,13 @@ async def test_heatmap_ratio_uses_provider_free_flow_and_cache(tmp_path):
     assert h["source"].endswith("no-traffic time")
     again = await heatmap(r, store, timedelta(days=7), date(2026, 10, 13), time(8, 0), mode="ratio", per_side=3)
     assert again["provider_calls"] == 1  # only the previously unroutable cell is retried
+
+
+def test_logging_setup_keeps_httpx_quiet():
+    """httpx's INFO line prints the full URL, and the TomTom key is in the query string."""
+    import logging
+
+    from leiria_traffic.config import setup_logging
+
+    setup_logging()
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .config import Settings
+from .config import Settings, setup_logging
 from .heatmap import heatmap
 from .models import Point
 from .routing import ProviderError
@@ -25,7 +25,7 @@ state: dict[str, App] = {}
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    setup_logging()
     async with httpx.AsyncClient(timeout=20) as client:
         state["app"] = build(Settings.load(), client)
         yield
@@ -114,3 +114,25 @@ def save_route(name: str, origin: str, dest: str, origin_label: str = "", dest_l
     rid = _app().store.add_route(name, _point(origin, "origin"), _point(dest, "dest"),
                                  origin_label, dest_label, collect)
     return {"route_id": rid}
+
+
+@api.get("/api/places")
+def places() -> list[dict]:
+    """Favourite places (Home, Work, ...)."""
+    return _app().store.places()
+
+
+@api.put("/api/places/{name}")
+def save_place(name: str, point: str, label: str = "") -> dict:
+    name = name.strip()
+    if not name:
+        raise HTTPException(422, "name is empty")
+    _app().store.put_place(name, _point(point, "point"), label)
+    return {"name": name}
+
+
+@api.delete("/api/places/{name}")
+def delete_place(name: str) -> dict:
+    if not _app().store.delete_place(name):
+        raise HTTPException(404, f"no favourite called {name!r}")
+    return {"deleted": name}

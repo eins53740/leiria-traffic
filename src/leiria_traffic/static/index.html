@@ -40,6 +40,11 @@
   .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:var(--bg); border:1px solid var(--line) }
   .legend { display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px }
   .legend span.bar { flex:1; height:10px; border-radius:5px; background:linear-gradient(90deg,#1a9850,#fee08b,#d73027) }
+  .favs { display:flex; flex-wrap:wrap; gap:6px }
+  .fav { display:inline-flex; align-items:center; gap:4px; padding:3px 4px 3px 9px; border:1px solid var(--line); border-radius:14px; background:var(--bg) }
+  button.mini { border:1px solid var(--line); background:var(--card); color:var(--ink); font:inherit; font-size:12px; padding:3px 8px; border-radius:10px; cursor:pointer }
+  button.mini:hover { border-color:var(--accent); color:var(--accent) }
+  .row.favsave { margin-top:6px; align-items:center } .row.favsave input { flex:2 } .row.favsave button { flex:0 0 auto }
   [hidden] { display:none !important }
 </style>
 </head>
@@ -58,6 +63,14 @@
       <div class="hits"><input id="qa" placeholder="e.g. Leiria, Praça Rodrigues Lobo"><ul id="ha"></ul></div>
       <label>Point B (destination)</label>
       <div class="hits"><input id="qb" placeholder="e.g. Maceira"><ul id="hb"></ul></div>
+      <label>Favourites — click A or B to use one</label>
+      <div class="favs" id="favs"><span class="muted">none yet</span></div>
+      <div class="row favsave">
+        <input id="favname" list="favnames" placeholder="name, e.g. Home"><datalist id="favnames"><option>Home</option><option>Work</option></datalist>
+        <button class="mini" id="saveA" title="save Point A under this name">★ save A</button>
+        <button class="mini" id="saveB" title="save Point B under this name">★ save B</button>
+        <button class="mini" id="swap" title="swap A and B (home→work becomes work→home)">⇅</button>
+      </div>
       <div class="row">
         <div><label>Date</label><input type="date" id="day"></div>
         <div><label>Weather</label><select id="weather">
@@ -157,6 +170,34 @@ try { const s = JSON.parse(localStorage.getItem('lt.pts') || '{}'); ['a', 'b'].f
     }, 350);
   });
 });
+
+/* ---------------- favourites (stored on the server, shared with the collector) ---------------- */
+async function loadFavs() {
+  const favs = await getJSON('/api/places');
+  const box = $('#favs'); box.innerHTML = favs.length ? '' : '<span class="muted">none yet</span>';
+  favs.forEach(f => {
+    const [lat, lon] = f.point.split(',').map(Number), chip = document.createElement('span');
+    chip.className = 'fav'; chip.title = f.label || f.point;
+    chip.innerHTML = '<b></b><button class="mini" data-k="a">A</button><button class="mini" data-k="b">B</button><button class="mini" data-del title="remove">×</button>';
+    chip.querySelector('b').textContent = f.name;
+    chip.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { setPoint(b.dataset.k, lat, lon, `★ ${f.name}`); map.panTo([lat, lon]); });
+    chip.querySelector('[data-del]').onclick = async () => {
+      await fetch(`/api/places/${encodeURIComponent(f.name)}`, { method: 'DELETE' }); loadFavs(); };
+    box.appendChild(chip);
+  });
+}
+async function saveFav(k) {
+  const name = $('#favname').value.trim();
+  if (!name) return status('⚠ type a name first (e.g. Home)');
+  if (!pts[k]) return status(`⚠ pick Point ${k.toUpperCase()} first`);
+  const p = pts[k], label = (p.label || '').replace(/^★ /, '');
+  const r = await fetch(`/api/places/${encodeURIComponent(name)}?point=${p.lat},${p.lon}&label=${encodeURIComponent(label)}`, { method: 'PUT' });
+  if (!r.ok) return status(`⚠ could not save (HTTP ${r.status})`);
+  status(`★ saved ${k.toUpperCase()} as ${name}`); $('#favname').value = ''; loadFavs();
+}
+$('#saveA').onclick = () => saveFav('a'); $('#saveB').onclick = () => saveFav('b');
+$('#swap').onclick = () => { const a = pts.a, b = pts.b; if (b) setPoint('a', b.lat, b.lon, b.label); if (a) setPoint('b', a.lat, a.lon, a.label); };
+loadFavs().catch(e => status(e.message));
 
 /* ---------------- profile ---------------- */
 let chart;

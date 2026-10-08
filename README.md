@@ -21,6 +21,9 @@ uv run leiria-traffic serve          # http://127.0.0.1:8765
   window, then press *Generate*. You get a chart and a table of 144 departures, the best and worst
   slot in the window, and the provider's no-traffic time. *Compare scenarios* overlays the next real
   date of each kind (term, school break, summer, public holiday) for the same weekday.
+- **Favourites:** type a name (Home, Work, …) and press *★ save A* or *★ save B*. The chips then
+  set A or B in one click, *⇅* swaps them, and *×* removes a favourite. Favourites live in the
+  SQLite store, so they survive browser changes.
 - **Leiria heatmap tab:** a 10×10 grid (±6 km around Praça Rodrigues Lobo) for one departure slot.
   - *Congestion* = predicted ÷ no-traffic time, both from TomTom.
   - *Minutes* = travel time to or from the centre.
@@ -57,6 +60,7 @@ uv run leiria-traffic collect        # what the scheduled task runs
 | `GET /api/scenarios?weekday=0..6` | The next real date for term, school break, summer and public holiday |
 | `GET /api/heatmap?day=…&at=HH:MM&mode=time\|ratio&direction=in\|out` | Grid cells with minutes and ratio |
 | `GET /api/geocode?q=…` | TomTom place search, biased to Leiria |
+| `GET /api/places` · `PUT/DELETE /api/places/{name}?point=lat,lon` | Favourite places |
 | `GET/POST /api/routes` | Saved routes. `collect=true` puts a route in the collector |
 
 Example (live, 2026-10-08), Leiria centre → Maceira, Tuesday 13 Oct 2026:
@@ -135,8 +139,11 @@ historical patterns. Full notes and URLs are in [docs/research.md](docs/research
   cached for 7 days. The free tier covers about 130 new profiles a month.
 - **Terms.** The TomTom terms limit storing results to what the cache headers allow, for a single
   user. This is a personal tool and the cache is local.
-- **Google fallback.** The key in `API_Keys.md` reaches Google, but the Routes API is **disabled** in
-  its GCP project (tested 2026-10-08). Until it is enabled, the fallback is skipped.
+- **Google fallback.** Coded but off: the Routes API needs a billing account even inside the free
+  calls, and this project spends nothing. No free provider without a card offers future-departure
+  traffic (see `docs/research.md`), so TomTom is the only active provider.
+- **Logs.** httpx is kept at WARNING because its INFO line prints the request URL, which carries the
+  TomTom key.
 
 ## Tests
 

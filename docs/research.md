@@ -51,6 +51,30 @@ live times in one call, and it is the cheapest paid option. Google is the fallba
 source of a provider range (chosen by Bruno, 2026-10-08). HERE is the candidate for past-date
 scenarios if that becomes necessary.
 
+### Free fallback search (2026-10-08)
+
+Requirement: no card or billing account, traffic for a future departure, and a hard stop at the free limit.
+**No provider meets all three.** Every API with documented future-departure traffic needs a card.
+
+| Provider | Future-departure traffic | Free / month | Card | At the limit |
+|---|---|---|---|---|
+| Mapbox | ✔ `driving-traffic` + `depart_at` | 100 000 | required | billed |
+| HERE v8 | ✔ `departureTime` | not published | required (Base plan) | billed |
+| Azure Maps | current traffic only | 1 000 | required | pay-as-you-go |
+| Stadia | ✔ only on paid plans | 200 000 credits | no | stops |
+| Geoapify | ✘ (`traffic=approximated`, same for every slot) | ~90 000 | no | soft limit |
+| GraphHopper, OpenRouteService, LocationIQ, OSRM | not documented | various | no / n.d. | various |
+
+Sources: https://docs.mapbox.com/api/navigation/directions/ ·
+https://docs.mapbox.com/help/faq/how-can-i-remove-a-credit-card-from-my-account ·
+https://docs.here.com/routing/docs/routing-v8-traffic-in-routing ·
+https://www.here.com/learn/blog/how-to-get-started-with-here-platform ·
+https://stadiamaps.com/pricing/ · https://apidocs.geoapify.com/docs/routing/ · https://www.geoapify.com/pricing/
+
+Decision: TomTom stays the only active provider. Its free tier needs no card. Google stays configured
+but off (no billing). A Geoapify fallback would only report "a route exists, about N min with no
+time-of-day traffic", so it is not wired in.
+
 ## Context sources
 
 | Factor | Source | Notes |
