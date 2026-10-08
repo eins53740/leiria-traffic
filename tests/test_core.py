@@ -216,7 +216,7 @@ def test_remote_clients_need_the_access_key(store):
         c = TestClient(api.api)  # client host is "testclient", so it counts as remote
         assert c.get("/api/places").status_code == 401
         page = c.get("/")
-        assert page.status_code == 401 and 'action="/login"' in page.text
+        assert page.status_code == 200 and 'action="/login"' in page.text
         assert c.post("/login", data={"key": "wrong"}).status_code == 401
         ok = c.post("/login", data={"key": "k3y"}, follow_redirects=False)
         assert ok.status_code == 303 and "httponly" in ok.headers["set-cookie"].lower()

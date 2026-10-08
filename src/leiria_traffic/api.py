@@ -66,7 +66,7 @@ async def require_access_key(request: Request, call_next):
     if hmac.compare_digest(request.cookies.get(COOKIE, ""), key):
         return await call_next(request)
     if request.url.path == "/":
-        return HTMLResponse(LOGIN_PAGE.format(msg="Access key (API_Keys.md, leiria-traffic):"), status_code=401)
+        return HTMLResponse(LOGIN_PAGE.format(msg="Access key (API_Keys.md, leiria-traffic):"))
     return JSONResponse({"detail": "access key required"}, status_code=401)
 
 

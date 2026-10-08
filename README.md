@@ -23,6 +23,7 @@ uv run leiria-traffic serve          # http://127.0.0.1:8765
 powershell -ExecutionPolicy Bypass -File scripts\install-webui-task.ps1   # once, from an elevated shell
 ```
 
+- Open http://vmhost1:8765 (or http://vmhost1.secil.pt:8765) from any machine on the Secil LAN.
 - This registers the task `\BD\LeiriaTraffic\WebUI`, which starts at logon and serves on `0.0.0.0:8765`.
   It also adds a firewall rule for TCP 8765 on the Private profile only.
 - Stop it by hand with `Stop-ScheduledTask -TaskPath '\BD\LeiriaTraffic' -TaskName WebUI`. Start it again

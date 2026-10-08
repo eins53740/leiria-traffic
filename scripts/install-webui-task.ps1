@@ -14,7 +14,7 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) 
 $principal = New-ScheduledTaskPrincipal -UserId "$env:COMPUTERNAME\bsdias" -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskPath '\BD\LeiriaTraffic\' -TaskName WebUI -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force `
-    -Description "leiria-traffic web UI on http://${env:COMPUTERNAME}:$port (LAN, access key in .env). Stop manually." | Out-Null
+    -Description "leiria-traffic web UI on http://$($env:COMPUTERNAME.ToLower()):$port (LAN, access key in .env). Stop manually." | Out-Null
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
